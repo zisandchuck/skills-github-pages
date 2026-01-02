@@ -24,25 +24,19 @@
     </div>
     <button class="btn" id="genKeyBtn" disabled>生成卡密</button>
     <p class="tip">卡密格式：Free-XXXXXXXXXXXXXXXX（16小时内有效）</p>
-    <p class="tip">仅完成LootLabs广告的用户可生成，刷新页面需重新完成广告</p>
+    <p class="tip">仅从指定广告页进入可生成，刷新页面需重新完成广告</p>
 
     <script>
-        // 配置你的LootLabs短链
-        const LOOTLABS_LINK = "https://lootdest.org/s?ZzixBxyu";
-        // 验证来源：仅允许从LootLabs短链跳转
-        const ALLOWED_REFERRER = "lootdest.org";
-
-        // 1. 来源验证（核心防刷）
-        function checkReferrer() {
+        // 配置指定的LootLabs短链
+        const TARGET_LOOTLABS_LINK = "https://lootdest.org/s?ZzixBxyu";
+        
+        // 1. 精准验证上一页地址
+        function checkExactReferrer() {
             const referrer = document.referrer;
-            // 无来源（直接访问）→ 跳转广告页
-            if (!referrer) {
-                window.location.href = LOOTLABS_LINK;
-                return false;
-            }
-            // 来源不是LootLabs → 跳转广告页
-            if (!referrer.includes(ALLOWED_REFERRER)) {
-                window.location.href = LOOTLABS_LINK;
+            // 严格匹配上一页地址是否为指定的LootLabs短链
+            if (referrer !== TARGET_LOOTLABS_LINK) {
+                // 立即跳转回指定短链
+                window.location.href = TARGET_LOOTLABS_LINK;
                 return false;
             }
             // 验证通过
@@ -64,13 +58,12 @@
                 .catch(() => document.getElementById("alert").textContent = "❌ 复制失败，请手动复制");
         }
 
-        // 页面初始化
+        // 页面初始化：优先执行精准验证
         window.onload = () => {
-            // 先执行来源验证
-            const isVerified = checkReferrer();
+            const isVerified = checkExactReferrer();
             if (!isVerified) return;
 
-            // 绑定生成卡密按钮事件
+            // 绑定生成卡密事件
             const btn = document.getElementById("genKeyBtn");
             const container = document.getElementById("keyContainer");
             let isGenerated = false;
