@@ -14,11 +14,13 @@
         .btn:disabled { background: #64748b; cursor: not-allowed; }
         .tip { color: #94a3b8; font-size: 0.9rem; text-align: center; margin: 0.5rem 0; }
         .alert { color: #f87171; font-size: 1rem; text-align: center; margin: 1rem 0; font-weight: bold; }
+        .mobile-tip { color: #f59e0b; font-size: 1rem; text-align: center; margin: 1rem 0; }
     </style>
 </head>
 <body>
     <h1 class="header">🎉 Roblox 免费卡密获取</h1>
     <div class="alert" id="alert"></div>
+    <div class="mobile-tip" id="mobileTip" style="display: none;">📱 移动端请手动打开广告页：<a href="https://lootdest.org/s?ZzixBxyu" target="_blank" style="color:#4ade80">点击打开广告</a></div>
     <div class="key-card" id="keyContainer">
         <span class="tip">完成广告后点击下方按钮生成卡密</span>
     </div>
@@ -27,28 +29,31 @@
     <p class="tip">仅从指定广告页进入可生成，刷新页面需重新完成广告</p>
 
     <script>
-        // 配置项（必须与 Cloudflare Workers/Roblox 端完全一致！）
         const TARGET_LOOTLABS_LINK = "https://lootdest.org/s?ZzixBxyu";
-        const SECRET_KEY = "RobloxDynamicKey_Secret_2024_123456"; // 共享密钥
+        const SECRET_KEY = "RobloxDynamicKey_Secret_2024_123456";
         const KEY_PREFIX = "Free-";
-        const TS_LENGTH = 8;    // 时间戳长度
-        const RANDOM_LENGTH = 8;// 随机串长度
-        const SIGN_LENGTH = 8;  // 签名长度
-        const TOTAL_SUFFIX_LENGTH = TS_LENGTH + RANDOM_LENGTH + SIGN_LENGTH; // 24位后缀
+        const TS_LENGTH = 8;
+        const RANDOM_LENGTH = 8;
+        const SIGN_LENGTH = 8;
 
-        // 1. 精准验证上一页地址（你的原版逻辑，一字未改）
+        // 🔥 移动端适配：延迟验证+强制跳转
         function checkExactReferrer() {
-            const referrer = document.referrer;
-            if (referrer !== TARGET_LOOTLABS_LINK) {
-                window.location.href = TARGET_LOOTLABS_LINK;
-                return false;
-            }
-            document.getElementById("genKeyBtn").disabled = false;
-            document.getElementById("alert").textContent = "✅ 广告验证通过，可生成卡密";
-            return true;
+            // 延迟500ms执行，确保移动端referrer正确获取
+            setTimeout(() => {
+                const referrer = document.referrer;
+                if (referrer !== TARGET_LOOTLABS_LINK) {
+                    // 用replace代替href，强制跳转（避免移动端拦截）
+                    window.location.replace(TARGET_LOOTLABS_LINK);
+                    // 移动端兜底：显示手动打开广告的提示（防止跳转被拦截）
+                    document.getElementById("mobileTip").style.display = "block";
+                    return false;
+                }
+                document.getElementById("genKeyBtn").disabled = false;
+                document.getElementById("alert").textContent = "✅ 广告验证通过，可生成卡密";
+                return true;
+            }, 500);
         }
 
-        // 2. 生成签名（核心！与 Cloudflare 算法完全一致）
         function generateSignature(tsStr, randomPart) {
             const str = `${tsStr}-${randomPart}-${SECRET_KEY}`;
             let hash = 0;
@@ -59,35 +64,27 @@
             return Math.abs(hash).toString(16).padStart(SIGN_LENGTH, "0").slice(0, SIGN_LENGTH);
         }
 
-        // 3. 生成带签名的卡密（不是纯随机！和 Cloudflare 匹配）
         function generateKey() {
-            // 生成8位秒级时间戳
             const timestamp = Math.floor(Date.now() / 1000).toString().padStart(TS_LENGTH, "0").slice(-TS_LENGTH);
-            // 生成8位随机串
             const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
             let randomPart = "";
             for (let i = 0; i < RANDOM_LENGTH; i++) {
                 randomPart += chars[Math.floor(Math.random() * chars.length)];
             }
-            // 生成8位签名
             const sign = generateSignature(timestamp, randomPart);
-            // 拼接成 Free-24位 卡密
             return KEY_PREFIX + timestamp + randomPart + sign;
         }
 
-        // 4. 复制卡密（你的原版逻辑）
         function copyKey(key) {
             navigator.clipboard.writeText(key)
                 .then(() => document.getElementById("alert").textContent = `✅ 卡密已复制：${key}`)
                 .catch(() => document.getElementById("alert").textContent = "❌ 复制失败，请手动复制");
         }
 
-        // 页面初始化：优先执行精准验证（你的原版逻辑）
+        // 页面加载后立即执行验证（移动端适配）
         window.onload = () => {
-            const isVerified = checkExactReferrer();
-            if (!isVerified) return;
+            checkExactReferrer();
 
-            // 绑定生成卡密事件
             const btn = document.getElementById("genKeyBtn");
             const container = document.getElementById("keyContainer");
             let isGenerated = false;
