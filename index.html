@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Free Roblox 卡密获取</title>
+    <title>Free Roblox 动态卡密</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Arial', sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         body { background: #0f172a; color: #f8fafc; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
         .header { text-align: center; color: #818cf8; margin-bottom: 2rem; font-size: 2rem; }
         .countdown-card { background: #1e293b; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; text-align: center; border-left: 4px solid #f87171; }
         .countdown-text { font-size: 1.2rem; color: #f87171; font-weight: bold; }
-        .key-card { background: #1e293b; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; text-align: center; min-height: 120px; display: flex; align-items: center; justify-content: center; }
-        .key-display { font-size: 1.5rem; font-weight: bold; color: #818cf8; letter-spacing: 2px; cursor: pointer; transition: all 0.3s; }
-        .key-display:hover { color: #a5b4fc; }
+        .key-card { background: #1e293b; padding: 2rem; border-radius: 12px; margin-bottom: 1.5rem; text-align: center; min-height: 120px; display: flex; align-items: center; justify-content: center; }
+        .key-display { font-size: 1.5rem; font-weight: bold; color: #818cf8; letter-spacing: 2px; cursor: pointer; }
         .btn { width: 100%; padding: 1.2rem; background: #818cf8; color: white; border: none; border-radius: 12px; font-size: 1.1rem; cursor: pointer; transition: all 0.3s; margin-bottom: 1rem; }
         .btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.7; }
         .tip-text { color: #94a3b8; font-size: 0.9rem; text-align: center; margin-bottom: 0.5rem; }
@@ -20,129 +19,166 @@
         .success { color: #4ade80; }
         .error { color: #f87171; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <h1 class="header">🎉 Free Roblox 卡密获取</h1>
+    <h1 class="header">🎉 Free Roblox 动态卡密</h1>
 
-    <!-- 网页有效期倒计时 -->
     <div class="countdown-card">
         <p class="countdown-text">网页将在 <span id="expire-time">300</span> 秒后失效，请尽快获取卡密！</p>
     </div>
 
-    <!-- 卡密显示容器 -->
     <div class="key-card" id="key-container">
         <span class="tip-text">点击下方按钮获取卡密</span>
     </div>
 
-    <!-- 获取卡密按钮 -->
-    <button class="btn" id="get-key-btn">点击获取免费卡密</button>
+    <button class="btn" id="get-key-btn" disabled>点击获取免费卡密</button>
 
-    <!-- 提示信息 -->
     <p class="tip-text">卡密格式：Free-XXXXXXXXXXXXXXXX（激活后16小时内有效）</p>
     <p class="tip-text">每个页面仅可获取1次卡密，重新获取需完成LootLabs广告</p>
     <div class="message" id="message-box"></div>
 
     <script>
-        // 已填入你的Worker域名，无需修改！
-        const WORKER_API_URL = "https://roblox-auth.check868.workers.dev";
-        // 替换为你的LootLabs短链（必填，否则5分钟后跳转失效）
-        const LOOTLABS_LINK = "https://lootlabs.com/link/你的短链"; 
-        const PAGE_EXPIRE_SEC = 5 * 60; // 5分钟网页有效期
+        // 配置信息（已填完整）
+        const SUPABASE_URL = "https://tsbxfqepksspgzmuyywv.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_74klMxblBBRjlOlDhBELlQ_7_7oJsf-";
+        const LOOTLABS_LINK = "https://lootdest.org/s?ZzixBxyu"; // 你的LootLabs短链
+        const ALLOWED_REFERRER = "https://lootdest.org/s?ZzixBxyu"; // 允许的来源页
 
-        // 核心状态变量
+        // 核心常量
+        const PAGE_EXPIRE_SEC = 5 * 60;
+        const KEY_PREFIX = "Free";
+        const KEY_LENGTH = 16;
+        const KEY_VALID_DURATION = 16 * 3600 * 1000;
+
+        // 状态变量
         let isBtnClicked = false;
-        let pageId = generatePageId();
+        let pageId = Math.random().toString(36).slice(2, 18) + Math.random().toString(36).slice(2, 18);
         let expireTimer = null;
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 生成会话唯一PageId
-        function generatePageId() {
-            return Math.random().toString(36).slice(2, 18) + Math.random().toString(36).slice(2, 18);
+        // 来源验证：仅允许从LootLabs短链进入
+        function checkReferrer() {
+            const referrer = document.referrer; // 获取上一页地址
+            const currentUrl = window.location.href; // 当前卡密页地址
+
+            // 情况1：直接打开卡密页（无来源）→ 跳转LootLabs
+            if (!referrer || referrer === "") {
+                window.location.href = LOOTLABS_LINK;
+                return false;
+            }
+
+            // 情况2：来源不是指定的LootLabs短链 → 跳转LootLabs
+            if (!referrer.includes(ALLOWED_REFERRER) && !currentUrl.includes(ALLOWED_REFERRER)) {
+                window.location.href = LOOTLABS_LINK;
+                return false;
+            }
+
+            // 验证通过，启用按钮
+            document.getElementById("get-key-btn").disabled = false;
+            showMessage("来源验证通过，可获取卡密", "success");
+            return true;
         }
 
-        // 页面加载初始化
-        window.onload = async () => {
-            const getKeyBtn = document.getElementById("get-key-btn");
-            const keyContainer = document.getElementById("key-container");
-            const messageBox = document.getElementById("message-box");
-            const expireTimeEl = document.getElementById("expire-time");
+        // 生成唯一卡密
+        async function generateUniqueKey() {
+            let key;
+            do {
+                const randomNum = Math.random().toString().substring(2, 2 + KEY_LENGTH).padEnd(KEY_LENGTH, "0");
+                key = `${KEY_PREFIX}-${randomNum}`;
+                const { data: existingKey } = await supabase
+                    .from("keys")
+                    .select("key_value")
+                    .eq("key_value", key)
+                    .single();
+                if (!existingKey) break;
+            } while (true);
+            return key;
+        }
 
-            // 验证页面有效性
-            try {
-                const res = await fetch(`${WORKER_API_URL}/check-page-valid?pageId=${pageId}`);
-                // 校验响应是否正常
-                if (!res.ok) throw new Error(`接口返回错误：${res.status}`);
-                
-                const data = await res.json();
-                if (!data.valid) {
-                    keyContainer.innerHTML = '<span class="error">网页链接已失效！</span>';
-                    getKeyBtn.disabled = true;
-                    setTimeout(() => window.location.href = LOOTLABS_LINK, 3000);
-                    return;
-                }
-
-                // 初始化倒计时
-                let remainSec = data.expireIn || PAGE_EXPIRE_SEC;
-                expireTimeEl.textContent = remainSec;
-                expireTimer = setInterval(() => {
-                    remainSec--;
-                    expireTimeEl.textContent = remainSec;
-                    if (remainSec <= 0) {
-                        clearInterval(expireTimer);
-                        window.location.href = LOOTLABS_LINK;
-                    }
-                }, 1000);
-
-                // 绑定按钮点击事件
-                getKeyBtn.addEventListener("click", async () => {
-                    if (isBtnClicked) {
-                        showMessage("当前页面已获取过卡密！", "error");
-                        return;
-                    }
-
-                    isBtnClicked = true;
-                    getKeyBtn.disabled = true;
-                    keyContainer.innerHTML = '<span class="tip-text">正在生成卡密...</span>';
-
-                    // 调用生成卡密接口
-                    try {
-                        const keyRes = await fetch(`${WORKER_API_URL}/generate-key?pageId=${pageId}`);
-                        if (!keyRes.ok) throw new Error(`卡密接口错误：${keyRes.status}`);
-                        
-                        const keyData = await keyRes.json();
-                        if (keyData.success) {
-                            keyContainer.innerHTML = `<span class="key-display" onclick="copyKey('${keyData.key}')">${keyData.key}</span>`;
-                            showMessage(keyData.message, "success");
-                        } else {
-                            keyContainer.innerHTML = '<span class="tip-text">点击下方按钮获取卡密</span>';
-                            showMessage(keyData.message, "error");
-                        }
-                    } catch (err) {
-                        keyContainer.innerHTML = '<span class="tip-text">点击下方按钮获取卡密</span>';
-                        showMessage(`卡密生成失败：${err.message}`, "error");
-                    }
-                });
-            } catch (err) {
-                // 打印错误详情到控制台，方便排查
-                console.error("页面初始化失败详情：", err);
-                showMessage(`页面初始化失败：${err.message}`, "error");
-                getKeyBtn.disabled = true;
-            }
-        };
-
-        // 复制卡密到剪贴板
+        // 复制卡密
         function copyKey(key) {
             navigator.clipboard.writeText(key)
                 .then(() => showMessage(`卡密已复制：${key}`, "success"))
                 .catch(() => showMessage("复制失败，请手动复制", "error"));
         }
 
-        // 显示提示信息
+        // 显示提示
         function showMessage(text, type) {
-            const messageBox = document.getElementById("message-box");
-            messageBox.textContent = text;
-            messageBox.className = `message ${type}`;
-            setTimeout(() => messageBox.className = "message", 5000);
+            const msgBox = document.getElementById("message-box");
+            msgBox.textContent = text;
+            msgBox.className = `message ${type}`;
+            setTimeout(() => msgBox.className = "message", 5000);
         }
+
+        // 页面初始化
+        window.onload = async () => {
+            const btn = document.getElementById("get-key-btn");
+            const keyContainer = document.getElementById("key-container");
+            const expireEl = document.getElementById("expire-time");
+
+            // 第一步：执行来源验证
+            const isVerified = checkReferrer();
+            if (!isVerified) return;
+
+            // 第二步：初始化5分钟倒计时
+            let remainSec = PAGE_EXPIRE_SEC;
+            expireTimer = setInterval(() => {
+                remainSec--;
+                expireEl.textContent = remainSec;
+                if (remainSec <= 0) {
+                    clearInterval(expireTimer);
+                    window.location.href = LOOTLABS_LINK; // 超时跳转LootLabs
+                }
+            }, 1000);
+
+            // 第三步：绑定按钮点击事件
+            btn.addEventListener("click", async () => {
+                if (isBtnClicked) {
+                    showMessage("当前页面已获取过卡密！", "error");
+                    return;
+                }
+
+                isBtnClicked = true;
+                btn.disabled = true;
+                keyContainer.innerHTML = '<span class="tip-text">正在生成卡密...</span>';
+
+                try {
+                    // 检查当前pageId是否已生成卡密
+                    const { data: existingPageKey } = await supabase
+                        .from("keys")
+                        .select("key_value")
+                        .eq("page_id", pageId)
+                        .single();
+                    if (existingPageKey) {
+                        keyContainer.innerHTML = `<span class="key-display" onclick="copyKey('${existingPageKey.key_value}')">${existingPageKey.key_value}</span>`;
+                        showMessage("当前页面卡密已生成！", "success");
+                        return;
+                    }
+
+                    // 生成并存储新卡密
+                    const newKey = await generateUniqueKey();
+                    const { data: insertedKey, error } = await supabase
+                        .from("keys")
+                        .insert([{
+                            key_value: newKey,
+                            status: "unused",
+                            activate_time: 0,
+                            valid_duration: KEY_VALID_DURATION,
+                            page_id: pageId
+                        }])
+                        .select();
+
+                    if (error) throw error;
+                    keyContainer.innerHTML = `<span class="key-display" onclick="copyKey('${newKey}')">${newKey}</span>`;
+                    showMessage("卡密生成成功！激活后16小时内有效", "success");
+                } catch (err) {
+                    keyContainer.innerHTML = '<span class="tip-text">点击下方按钮获取卡密</span>';
+                    showMessage(`卡密生成失败：${err.message}`, "error");
+                    console.error("生成失败详情：", err);
+                }
+            });
+        };
 
         // 页面关闭清理定时器
         window.onbeforeunload = () => {
@@ -151,3 +187,4 @@
     </script>
 </body>
 </html>
+
