@@ -23,14 +23,19 @@
         <span class="tip">完成广告后点击下方按钮生成卡密</span>
     </div>
     <button class="btn" id="genKeyBtn" disabled>生成卡密</button>
-    <p class="tip">卡密格式：Free-XXXXXXXXXXXXXXXX（16小时内有效）</p>
+    <p class="tip">卡密格式：Free-XXXXXXXXXXXXXXXXXXXXXXXX（24位字符）</p>
     <p class="tip">仅从指定广告页进入可生成，刷新页面需重新完成广告</p>
 
     <script>
-        // 配置指定的LootLabs短链
+        // 配置项（必须与 Cloudflare Workers/Roblox 端完全一致！）
         const TARGET_LOOTLABS_LINK = "https://lootdest.org/s?ZzixBxyu";
-        
-        // 🔥 BUG修复核心：把检测逻辑提到最顶部，立即执行，不等页面加载！
+        const SECRET_KEY = "RobloxDynamicKey_Secret_2024_123456"; // 共享密钥
+        const KEY_PREFIX = "Free-";
+        const TS_LENGTH = 8;    // 时间戳长度
+        const RANDOM_LENGTH = 8;// 随机串长度
+        const SIGN_LENGTH = 8;  // 签名长度
+        const TOTAL_SUFFIX_LENGTH = TS_LENGTH + RANDOM_LENGTH + SIGN_LENGTH; // 24位后缀
+
         // 1. 精准验证上一页地址（你的原版逻辑，一字未改）
         function checkExactReferrer() {
             const referrer = document.referrer;
@@ -43,25 +48,46 @@
             return true;
         }
 
-        // 立即执行检测！这行是关键！之前放在window.onload里执行太晚了！
-        const isVerified = checkExactReferrer();
-        if (!isVerified) return; // 验证失败直接退出，不执行后面的代码
-
-        // 2. 生成16位随机卡密（你的原版逻辑，已修复随机串长度）
-        function generateKey() {
-            const randomStr = Math.random().toString(36).slice(2, 18).padEnd(16, "0");
-            return `Free-${randomStr}`;
+        // 2. 生成签名（核心！与 Cloudflare 算法完全一致）
+        function generateSignature(tsStr, randomPart) {
+            const str = `${tsStr}-${randomPart}-${SECRET_KEY}`;
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash = hash & hash;
+            }
+            return Math.abs(hash).toString(16).padStart(SIGN_LENGTH, "0").slice(0, SIGN_LENGTH);
         }
 
-        // 3. 复制卡密（你的原版逻辑，一字未改）
+        // 3. 生成带签名的卡密（不是纯随机！和 Cloudflare 匹配）
+        function generateKey() {
+            // 生成8位秒级时间戳
+            const timestamp = Math.floor(Date.now() / 1000).toString().padStart(TS_LENGTH, "0").slice(-TS_LENGTH);
+            // 生成8位随机串
+            const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            let randomPart = "";
+            for (let i = 0; i < RANDOM_LENGTH; i++) {
+                randomPart += chars[Math.floor(Math.random() * chars.length)];
+            }
+            // 生成8位签名
+            const sign = generateSignature(timestamp, randomPart);
+            // 拼接成 Free-24位 卡密
+            return KEY_PREFIX + timestamp + randomPart + sign;
+        }
+
+        // 4. 复制卡密（你的原版逻辑）
         function copyKey(key) {
             navigator.clipboard.writeText(key)
                 .then(() => document.getElementById("alert").textContent = `✅ 卡密已复制：${key}`)
                 .catch(() => document.getElementById("alert").textContent = "❌ 复制失败，请手动复制");
         }
 
-        // 页面初始化：绑定生成卡密事件（验证通过后才执行这里）
+        // 页面初始化：优先执行精准验证（你的原版逻辑）
         window.onload = () => {
+            const isVerified = checkExactReferrer();
+            if (!isVerified) return;
+
+            // 绑定生成卡密事件
             const btn = document.getElementById("genKeyBtn");
             const container = document.getElementById("keyContainer");
             let isGenerated = false;
