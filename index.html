@@ -21,7 +21,6 @@
       background-color: #2d2d2d;
       padding: 30px;
       border-radius: 10px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.5);
     }
     button {
       padding: 12px 30px;
@@ -30,31 +29,23 @@
       color: white;
       border: none;
       border-radius: 5px;
-      cursor: pointer;
       font-size: 16px;
+      cursor: pointer;
     }
     button:disabled {
       background-color: #555;
-      cursor: not-allowed;
     }
-    #codeDisplay {
+    #code {
       margin-top: 20px;
       padding: 15px;
       background-color: #3d3d3d;
       border-radius: 5px;
       font-size: 18px;
-      letter-spacing: 2px;
       display: none;
-      word-break: break-all;
     }
     .error {
       color: #ff6b6b;
       margin-top: 10px;
-    }
-    .countdown {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #aaa;
     }
   </style>
 </head>
@@ -62,94 +53,60 @@
 <body>
 <div class="container">
   <h1>Roblox 工具卡密领取</h1>
-  <p>每次观看广告可获取 <b>1 个</b> 卡密（24 小时内账号只能使用一次）</p>
+  <p>观看广告后可获取 1 个卡密（24 小时内账号仅一次）</p>
 
-  <button id="genBtn">生成卡密</button>
-  <div id="codeDisplay"></div>
-  <div class="error" id="error"></div>
-  <div class="countdown" id="countdown"></div>
-
-  <p style="margin-top:12px;color:#888;">
-    卡密请在 Roblox 工具中输入验证
-  </p>
+  <button id="btn">生成卡密</button>
+  <div id="code"></div>
+  <div class="error" id="err"></div>
 </div>
 
 <script>
-/* ================= 基础配置 ================= */
+  const API = "https://roblox-auth.check868.workers.dev";
+  const btn = document.getElementById("btn");
+  const codeEl = document.getElementById("code");
+  const errEl = document.getElementById("err");
 
-const WORKER_API = "https://roblox-auth.check868.workers.dev";
-const PAGE_TTL = 10 * 60 * 1000; // 页面 10 分钟有效
+  // 读取 adToken
+  const params = new URLSearchParams(location.search);
+  const adToken = params.get("ad");
 
-/* ================= 工具函数 ================= */
+  // 页面 10 分钟有效
+  const PAGE_EXPIRE = 10 * 60 * 1000;
+  const enterTime = Date.now();
 
-// 获取 adToken
-function getAdToken() {
-  const p = new URLSearchParams(location.search);
-  return p.get("ad");
-}
-
-// 倒计时显示
-function startCountdown(endTime) {
-  const el = document.getElementById("countdown");
-  const btn = document.getElementById("genBtn");
-
-  const timer = setInterval(() => {
-    const left = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
-    if (left <= 0) {
-      el.textContent = "页面已过期，请重新观看广告进入";
-      btn.disabled = true;
-      clearInterval(timer);
-    } else {
-      el.textContent = `页面剩余时间：${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
-    }
-  }, 1000);
-}
-
-/* ================= 页面初始化 ================= */
-
-const adToken = getAdToken();
-const btn = document.getElementById("genBtn");
-const codeEl = document.getElementById("codeDisplay");
-const errEl = document.getElementById("error");
-
-// 没有 adToken 直接禁止
-if (!adToken || adToken.length < 8) {
-  btn.disabled = true;
-  errEl.textContent = "广告验证失败，请重新观看广告进入";
-} else {
-  startCountdown(Date.now() + PAGE_TTL);
-}
-
-/* ================= 生成卡密 ================= */
-
-btn.onclick = async () => {
-  btn.disabled = true;
-  errEl.textContent = "";
-  codeEl.style.display = "none";
-
-  try {
-    const res = await fetch(WORKER_API + "/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ adToken })
-    });
-
-    const data = await res.json();
-
-    if (!data.ok) {
-      throw new Error(data.msg || "生成失败");
-    }
-
-    codeEl.style.display = "block";
-    codeEl.textContent = "你的卡密：\n" + data.code;
-
-  } catch (e) {
-    errEl.textContent = e.message || "请求失败，请稍后再试";
-    btn.disabled = false;
+  if (!adToken) {
+    errEl.innerText = "广告验证失败，请重新观看广告进入";
+    btn.disabled = true;
   }
-};
+
+  btn.onclick = async () => {
+    if (Date.now() - enterTime > PAGE_EXPIRE) {
+      errEl.innerText = "页面已过期，请重新观看广告";
+      btn.disabled = true;
+      return;
+    }
+
+    btn.disabled = true;
+    errEl.innerText = "";
+
+    try {
+      const res = await fetch(API + "/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adToken })
+      });
+
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.msg);
+
+      codeEl.style.display = "block";
+      codeEl.innerText = "你的卡密：" + data.code;
+
+    } catch (e) {
+      errEl.innerText = e.message || "生成失败";
+      btn.disabled = false;
+    }
+  };
 </script>
 </body>
 </html>
