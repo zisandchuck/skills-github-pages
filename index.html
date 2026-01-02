@@ -12,15 +12,17 @@
         .key-display { font-size: 1.4rem; font-weight: bold; color: #4ade80; letter-spacing: 1px; cursor: pointer; }
         .btn { width: 100%; padding: 1rem; background: #818cf8; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-bottom: 1rem; }
         .btn:disabled { background: #64748b; cursor: not-allowed; }
+        .ad-btn { background: #f59e0b; margin-bottom: 1rem; }
         .tip { color: #94a3b8; font-size: 0.9rem; text-align: center; margin: 0.5rem 0; }
         .alert { color: #f87171; font-size: 1rem; text-align: center; margin: 1rem 0; font-weight: bold; }
-        .mobile-tip { color: #f59e0b; font-size: 1rem; text-align: center; margin: 1rem 0; }
+        .success { color: #4ade80; }
     </style>
 </head>
 <body>
     <h1 class="header">🎉 Roblox 免费卡密获取</h1>
     <div class="alert" id="alert"></div>
-    <div class="mobile-tip" id="mobileTip" style="display: none;">📱 移动端请手动打开广告页：<a href="https://lootdest.org/s?ZzixBxyu" target="_blank" style="color:#4ade80">点击打开广告</a></div>
+    <!-- 手动广告按钮：检测失败时显示 -->
+    <button class="btn ad-btn" id="adBtn" style="display: none;" onclick="openAd()">点击打开广告页</button>
     <div class="key-card" id="keyContainer">
         <span class="tip">完成广告后点击下方按钮生成卡密</span>
     </div>
@@ -36,24 +38,31 @@
         const RANDOM_LENGTH = 8;
         const SIGN_LENGTH = 8;
 
-        // 🔥 移动端适配：延迟验证+强制跳转
+        // 1. 你的原版referrer精准检测（去掉自动跳转！）
         function checkExactReferrer() {
-            // 延迟500ms执行，确保移动端referrer正确获取
-            setTimeout(() => {
-                const referrer = document.referrer;
-                if (referrer !== TARGET_LOOTLABS_LINK) {
-                    // 用replace代替href，强制跳转（避免移动端拦截）
-                    window.location.replace(TARGET_LOOTLABS_LINK);
-                    // 移动端兜底：显示手动打开广告的提示（防止跳转被拦截）
-                    document.getElementById("mobileTip").style.display = "block";
-                    return false;
-                }
+            const referrer = document.referrer;
+            if (referrer === TARGET_LOOTLABS_LINK) {
+                // 验证通过：解锁按钮
                 document.getElementById("genKeyBtn").disabled = false;
                 document.getElementById("alert").textContent = "✅ 广告验证通过，可生成卡密";
+                document.getElementById("alert").className = "alert success";
                 return true;
-            }, 500);
+            } else {
+                // 验证失败：显示手动广告按钮，不跳转！
+                document.getElementById("alert").textContent = "请先完成广告再生成卡密";
+                document.getElementById("adBtn").style.display = "block";
+                return false;
+            }
         }
 
+        // 2. 手动打开广告页（新标签页，避免回跳）
+        function openAd() {
+            window.open(TARGET_LOOTLABS_LINK, "_blank"); // 新标签页打开广告，不影响卡密页
+            document.getElementById("alert").textContent = "广告页已打开，看完后切回此页面即可";
+            document.getElementById("alert").className = "alert success";
+        }
+
+        // 3. 生成带签名的卡密（和Cloudflare匹配）
         function generateSignature(tsStr, randomPart) {
             const str = `${tsStr}-${randomPart}-${SECRET_KEY}`;
             let hash = 0;
@@ -75,15 +84,16 @@
             return KEY_PREFIX + timestamp + randomPart + sign;
         }
 
+        // 4. 复制卡密
         function copyKey(key) {
             navigator.clipboard.writeText(key)
                 .then(() => document.getElementById("alert").textContent = `✅ 卡密已复制：${key}`)
                 .catch(() => document.getElementById("alert").textContent = "❌ 复制失败，请手动复制");
         }
 
-        // 页面加载后立即执行验证（移动端适配）
+        // 页面初始化
         window.onload = () => {
-            checkExactReferrer();
+            checkExactReferrer(); // 执行检测，不自动跳转
 
             const btn = document.getElementById("genKeyBtn");
             const container = document.getElementById("keyContainer");
@@ -104,4 +114,3 @@
     </script>
 </body>
 </html>
-
