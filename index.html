@@ -1,195 +1,141 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <!-- 禁止iframe嵌入，防绕开广告 -->
-    <meta http-equiv="X-Frame-Options" content="DENY">
-    <title>Roblox工具卡密领取</title>
-    <style>
-body {
-  font-family: Arial, sans-serif;
-  max-width: 600px;
-  margin: 50px auto;
-  padding: 20px;
-  text-align: center;
-  background-color: #1a1a1a;
-  color: #ffffff;
-}
-.container {
-  background-color: #2d2d2d;
-  padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 0 15px rgba(0,0,0,0.5);
-}
-button {
-  padding: 12px 30px;
-  margin-top: 20px;
-  background-color: #7289da;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 16px;
-}
-button:disabled {
-  background-color: #555555;
-  cursor: not-allowed;
-}
-button:hover:not(:disabled) {
-  background-color: #677bc4;
-}
-#codeDisplay {
-  margin-top: 20px;
-  padding: 15px;
-  background-color: #3d3d3d;
-  border-radius: 5px;
-  font-size: 18px;
-  letter-spacing: 2px;
-  display: none;
-}
-.countdown {
-  margin-top: 10px;
-  font-size: 14px;
-  color: #7289da;
-}
-.button-cooldown {
-  margin-top: 5px;
-  font-size: 14px;
-  color: #ff6b6b;
-}
-.validity {
-  margin-top: 5px;
-  font-size: 14px;
-  color: #999;
-}
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <title>Roblox 工具卡密领取</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      text-align: center;
+      background-color: #1a1a1a;
+      color: #ffffff;
+    }
+    .container {
+      background-color: #2d2d2d;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    }
+    button {
+      padding: 12px 30px;
+      margin-top: 20px;
+      background-color: #7289da;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:disabled {
+      background-color: #555;
+      cursor: not-allowed;
+    }
+    #codeDisplay {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #3d3d3d;
+      border-radius: 5px;
+      font-size: 18px;
+      letter-spacing: 2px;
+      display: none;
+    }
+    .countdown {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #7289da;
+    }
+    .error {
+      color: #ff6b6b;
+      margin-top: 10px;
+    }
+  </style>
 </head>
+
 <body>
-    <div class="container" id="mainContainer" style="display: none;">
-        <h1>Roblox工具卡密领取</h1>
-        <p>你已完成广告验证，点击下方按钮生成卡密（10分钟内仅可生成1次）</p>
-        <button id="generateBtn" onclick="triggerCodeGeneration()">点击生成卡密</button>
-        <div class="button-cooldown" id="buttonCooldown" style="display: none;"></div>
-        <div id="codeDisplay"></div>
-        <div class="countdown" id="countdown"></div>
-        <div class="validity">卡密使用：打开Roblox工具后输入验证 | 页面10分钟后失效</div>
-    </div>
+<div class="container" id="main" style="display:none;">
+  <h1>Roblox 工具卡密领取</h1>
+  <p>广告验证完成后，可生成一次卡密（10 分钟有效）</p>
 
-    <script>
-// 核心配置
-const NEW_DIRECT_LINK = "https://direct-link.net/2615052/Pfqr63wwDqQQ"; // 新短链
-const VALID_DURATION = 600000; // 10分钟
-const BUTTON_COOLDOWN = 5000; // 5秒冷却
-let sessionExpireTimer = null;
+  <button id="genBtn">点击生成卡密</button>
+  <div id="codeDisplay"></div>
+  <div class="countdown" id="countdown"></div>
+  <div class="error" id="error"></div>
 
-// 页面加载：仅允许Linkvertise/direct-link来源访问
-window.onload = function() {
-  const referrer = document.referrer; // 上一页来源
-  const mainContainer = document.getElementById("mainContainer");
+  <p style="margin-top:10px;color:#999;">
+    打开 Roblox 工具 → 输入卡密验证
+  </p>
+</div>
 
-  // 验证条件：来源包含linkvertise/direct-link，或反绕过脚本验证通过
-  const isFromLinkvertise = referrer.includes("linkvertise.com") || referrer.includes("direct-link.net");
-  
-  // 来源验证失败 → 强制跳转新短链
-  if (!isFromLinkvertise) {
-    window.location.href = NEW_DIRECT_LINK;
-    return;
-  }
+<script>
+  // 已填充你的 Workers 接口地址
+  const WORKER_API = "https://roblox-auth.check868.workers.dev"; 
+  // 卡密有效时长（10分钟，与Workers保持一致）
+  const VALID_DURATION = 600000; 
+  // 已填充你的广告链接
+  const AD_LINK = "https://direct-link.net/2615052/Pfqr63wwDqQQ"; 
 
-  // 验证通过，显示卡密页面
-  mainContainer.style.display = "block";
-
-  // 启动10分钟页面倒计时
-  const expireTime = Date.now() + VALID_DURATION;
-  startExpireCountdown(expireTime);
-
-  // 10分钟后自动跳转+清除记录
-  sessionExpireTimer = setTimeout(() => {
-    localStorage.removeItem("last_generate_time");
-    window.location.href = NEW_DIRECT_LINK;
-  }, VALID_DURATION);
-};
-
-// 点击按钮：5秒冷却后生成卡密
-function triggerCodeGeneration() {
-  const generateBtn = document.getElementById("generateBtn");
-  const buttonCooldownEl = document.getElementById("buttonCooldown");
-  const now = Date.now();
-  const lastGenTime = Number(localStorage.getItem("last_generate_time")) || 0;
-
-  // 10分钟全局冷却校验
-  if (now - lastGenTime < VALID_DURATION) {
-    const remain = Math.ceil((VALID_DURATION - (now - lastGenTime)) / 60000);
-    const displayEl = document.getElementById("codeDisplay");
-    displayEl.style.display = "block";
-    displayEl.innerText = `请等待${remain}分钟后再生成！`;
-    return;
-  }
-
-  // 5秒冷却逻辑
-  generateBtn.disabled = true;
-  buttonCooldownEl.style.display = "block";
-  let remainingSeconds = BUTTON_COOLDOWN / 1000;
-  buttonCooldownEl.innerText = `卡密生成中... 剩余${remainingSeconds}秒`;
-
-  const cooldownInterval = setInterval(() => {
-    remainingSeconds--;
-    buttonCooldownEl.innerText = `卡密生成中... 剩余${remainingSeconds}秒`;
-    if (remainingSeconds <= 0) {
-      clearInterval(cooldownInterval);
-      generateCode();
-      generateBtn.disabled = false;
-      buttonCooldownEl.style.display = "none";
+  // 页面加载校验广告来源，未通过则跳转到广告
+  window.onload = () => {
+    const ref = document.referrer;
+    if (!ref.includes("linkvertise.com") && !ref.includes("direct-link.net")) {
+      location.href = AD_LINK;
+      return;
     }
-  }, 1000);
-}
 
-// 生成8位唯一卡密
-function generateCode() {
-  const newCode = generateRandomCode();
-  const now = Date.now();
-  const displayEl = document.getElementById("codeDisplay");
-
-  localStorage.setItem(`code_${newCode}`, now);
-  localStorage.setItem("last_generate_time", now);
-
-  displayEl.style.display = "block";
-  displayEl.innerText = "你的卡密：" + newCode;
-}
-
-// 生成随机卡密（避免重复）
-function generateRandomCode() {
-  let code = "";
-  const CHAR_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  do {
-    code = "";
-    for (let i = 0; i < 8; i++) {
-      code += CHAR_SET[Math.floor(Math.random() * CHAR_SET.length)];
-    }
-  } while (localStorage.getItem(`code_${code}`));
-  return code;
-}
-
-// 页面10分钟倒计时
-function startExpireCountdown(expireTime) {
-  const countdownEl = document.getElementById("countdown");
-  const update = () => {
-    const remain = Math.ceil((expireTime - Date.now()) / 1000);
-    countdownEl.innerText = remain <= 0
-      ? "页面即将失效！"
-      : `页面剩余有效时间：${Math.floor(remain / 60)}分${(remain % 60).toString().padStart(2, '0')}秒`;
+    document.getElementById("main").style.display = "block";
+    startCountdown(Date.now() + VALID_DURATION);
   };
-  update();
-  setInterval(update, 1000);
-}
 
-// 页面关闭清除定时器
-window.onunload = () => {
-  if (sessionExpireTimer) clearTimeout(sessionExpireTimer);
-};
-    </script>
+  // 点击生成卡密，请求Workers接口
+  document.getElementById("genBtn").onclick = async () => {
+    const btn = document.getElementById("genBtn");
+    const codeEl = document.getElementById("codeDisplay");
+    const errEl = document.getElementById("error");
+
+    btn.disabled = true;
+    errEl.innerText = "";
+
+    try {
+      const res = await fetch(`${WORKER_API}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "omit"
+      });
+
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.msg || "生成失败");
+
+      codeEl.style.display = "block";
+      codeEl.innerText = `你的卡密：${data.code}`;
+
+    } catch (e) {
+      errEl.innerText = e.message || "生成失败，请刷新页面重试";
+      btn.disabled = false;
+    }
+  };
+
+  // 页面有效期倒计时
+  function startCountdown(end) {
+    const el = document.getElementById("countdown");
+    const timer = setInterval(() => {
+      const t = Math.max(0, Math.floor((end - Date.now()) / 1000));
+      el.innerText = t <= 0
+        ? "页面已失效，请刷新重新验证广告"
+        : `页面剩余时间：${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
+      if (t <= 0) {
+        clearInterval(timer);
+        document.getElementById("genBtn").disabled = true;
+      }
+    }, 1000);
+  }
+</script>
 </body>
 </html>
 
