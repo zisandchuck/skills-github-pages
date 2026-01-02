@@ -11,12 +11,11 @@
         .key-card { background: #1e293b; padding: 2rem; border-radius: 12px; text-align: center; min-height: 120px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; }
         .key-display { font-size: 1.4rem; font-weight: bold; color: #4ade80; cursor: pointer; word-break: break-all; }
         .key-tip { font-size: 0.9rem; color: #94a3b8; }
-        .btn { width: 100%; padding: 1rem; background: #818cf8; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-bottom: 1rem; transition: background 0.2s; }
+        .btn { width: 100%; padding: 1rem; background: #818cf8; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-bottom: 1rem; }
         .btn:disabled { background: #64748b; cursor: not-allowed; }
-        .btn:hover:not(:disabled) { background: #6d76f7; }
         .alert { color: #f87171; font-size: 1rem; text-align: center; margin: 1rem 0; font-weight: bold; }
         .success { color: #4ade80; }
-        .tip { color: #94a3b8; font-size: 0.9rem; text-align: center; margin: 0.5rem 0; line-height: 1.5; }
+        .tip { color: #94a3b8; font-size: 0.9rem; text-align: center; margin: 0.5rem 0; }
     </style>
 </head>
 <body>
@@ -26,33 +25,36 @@
         <span class="tip">完成广告后点击按钮生成卡密</span>
     </div>
     <button class="btn" id="genKeyBtn" disabled>生成卡密</button>
-    <p class="tip">卡密格式：Free-XXXXXXXXXXXXXXXXXXXXXXXX（24位字符）<br>有效期：16小时 | 纯随机生成 | 一次使用 | 无法猜测</p>
+    <p class="tip">卡密格式：Free-XXXXXXXXXXXXXXXXXXXXXXXX（24位字符）</p>
     <p class="tip">仅从指定广告页进入可生成，刷新页面需重新完成广告</p>
 
     <script>
-        // 配置项（已填广告页链接）
+        // 配置项（无需修改）
         const SECRET_KEY = "RobloxDynamicKey_Secret_2024_123456";
-        const TARGET_LOOTLABS_LINK = "https://lootdest.org/s?ZzixBxyu"; // 你的广告页链接
+        const TARGET_AD_LINK = "https://lootdest.org/s?ZzixBxyu";
         const KEY_PREFIX = "Free-";
         const TS_LENGTH = 8;
         const RANDOM_LENGTH = 8;
         const SIGN_LENGTH = 8;
-        const KEY_VALID_DURATION = 16 * 3600; // 16小时（秒）
+        const KEY_VALID_DURATION = 16 * 3600;
 
-        // 1. 广告页跳转验证（防止直接访问）
+        // 🔥 核心：极简 referrer 验证（只判断上一页是不是广告链接）
         function checkAdReferrer() {
             const referrer = document.referrer;
-            if (referrer !== TARGET_LOOTLABS_LINK) {
-                window.location.href = TARGET_LOOTLABS_LINK;
+            // 用 includes 代替 ===，兼容广告页带额外参数的情况
+            if (referrer.includes(TARGET_AD_LINK)) {
+                document.getElementById("genKeyBtn").disabled = false;
+                document.getElementById("alert").textContent = "✅ 广告验证通过，可生成卡密";
+                document.getElementById("alert").className = "alert success";
+                return true;
+            } else {
+                // 验证失败，跳转到广告页
+                window.location.href = TARGET_AD_LINK;
                 return false;
             }
-            document.getElementById("genKeyBtn").disabled = false;
-            document.getElementById("alert").textContent = "✅ 广告验证通过，可生成卡密";
-            document.getElementById("alert").className = "alert success";
-            return true;
         }
 
-        // 2. 生成指定长度随机字符串（数字+大小写字母）
+        // 以下代码与之前一致，无需修改
         function generateRandomStr(length) {
             const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
             let str = "";
@@ -62,7 +64,6 @@
             return str;
         }
 
-        // 3. 生成签名（与 Workers 算法完全一致）
         function generateSignature(tsStr, randomPart) {
             const str = `${tsStr}-${randomPart}-${SECRET_KEY}`;
             let hash = 0;
@@ -73,26 +74,15 @@
             return Math.abs(hash).toString(16).padStart(SIGN_LENGTH, "0").slice(0, SIGN_LENGTH);
         }
 
-        // 4. 生成单字符串动态卡密（时间戳+随机+签名）
         function generateDynamicKey() {
-            // 生成8位秒级时间戳（补零/截断到8位）
             const timestamp = Math.floor(Date.now() / 1000).toString().padStart(TS_LENGTH, "0").slice(-TS_LENGTH);
-            // 生成8位随机字符
             const randomPart = generateRandomStr(RANDOM_LENGTH);
-            // 生成8位签名
             const sign = generateSignature(timestamp, randomPart);
-            // 拼接完整卡密
             const key = KEY_PREFIX + timestamp + randomPart + sign;
-            // 计算有效期时间
             const validUntil = new Date((Number(timestamp) + KEY_VALID_DURATION) * 1000);
-            return {
-                key: key,
-                validUntil: validUntil.toLocaleString(),
-                timestamp: timestamp
-            };
+            return { key: key, validUntil: validUntil.toLocaleString() };
         }
 
-        // 5. 复制卡密到剪贴板
         function copyKey(key) {
             navigator.clipboard.writeText(key)
                 .then(() => {
@@ -101,7 +91,6 @@
                 })
                 .catch(() => {
                     document.getElementById("alert").textContent = "❌ 复制失败，请手动复制卡密";
-                    document.getElementById("alert").className = "alert";
                 });
         }
 
@@ -117,20 +106,15 @@
             genBtn.addEventListener("click", () => {
                 if (isGenerated) {
                     document.getElementById("alert").textContent = "❌ 已生成过卡密，刷新页面需重新完成广告";
-                    document.getElementById("alert").className = "alert";
                     return;
                 }
-                // 生成卡密
                 const keyData = generateDynamicKey();
-                // 渲染卡密到页面
                 keyContainer.innerHTML = `
                     <span class="key-display" onclick="copyKey('${keyData.key}')">${keyData.key}</span>
                     <span class="key-tip">有效期至：${keyData.validUntil}（一次使用）</span>
                 `;
-                // 提示生成成功
                 document.getElementById("alert").textContent = "✅ 动态卡密生成成功！点击卡密复制";
                 document.getElementById("alert").className = "alert success";
-                // 标记为已生成
                 isGenerated = true;
                 genBtn.disabled = true;
             });
