@@ -45,96 +45,111 @@
       font-size: 18px;
       letter-spacing: 2px;
       display: none;
-    }
-    .countdown {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #7289da;
+      word-break: break-all;
     }
     .error {
       color: #ff6b6b;
       margin-top: 10px;
     }
+    .countdown {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #aaa;
+    }
   </style>
 </head>
 
 <body>
-<div class="container" id="main" style="display:none;">
+<div class="container">
   <h1>Roblox 工具卡密领取</h1>
-  <p>广告验证完成后，可生成一次卡密（10 分钟有效）</p>
+  <p>每次观看广告可获取 <b>1 个</b> 卡密（24 小时内账号只能使用一次）</p>
 
-  <button id="genBtn">点击生成卡密</button>
+  <button id="genBtn">生成卡密</button>
   <div id="codeDisplay"></div>
-  <div class="countdown" id="countdown"></div>
   <div class="error" id="error"></div>
+  <div class="countdown" id="countdown"></div>
 
-  <p style="margin-top:10px;color:#999;">
-    打开 Roblox 工具 → 输入卡密验证
+  <p style="margin-top:12px;color:#888;">
+    卡密请在 Roblox 工具中输入验证
   </p>
 </div>
 
 <script>
-  // 已填充你的 Workers 接口地址
-  const WORKER_API = "https://roblox-auth.check868.workers.dev"; 
-  // 卡密有效时长（10分钟，与Workers保持一致）
-  const VALID_DURATION = 600000; 
-  // 已填充你的广告链接
-  const AD_LINK = "https://direct-link.net/2615052/Pfqr63wwDqQQ"; 
+/* ================= 基础配置 ================= */
 
-  // 页面加载校验广告来源，未通过则跳转到广告
-  window.onload = () => {
-    const ref = document.referrer;
-    if (!ref.includes("linkvertise.com") && !ref.includes("direct-link.net")) {
-      location.href = AD_LINK;
-      return;
+const WORKER_API = "https://roblox-auth.check868.workers.dev";
+const PAGE_TTL = 10 * 60 * 1000; // 页面 10 分钟有效
+
+/* ================= 工具函数 ================= */
+
+// 获取 adToken
+function getAdToken() {
+  const p = new URLSearchParams(location.search);
+  return p.get("ad");
+}
+
+// 倒计时显示
+function startCountdown(endTime) {
+  const el = document.getElementById("countdown");
+  const btn = document.getElementById("genBtn");
+
+  const timer = setInterval(() => {
+    const left = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+    if (left <= 0) {
+      el.textContent = "页面已过期，请重新观看广告进入";
+      btn.disabled = true;
+      clearInterval(timer);
+    } else {
+      el.textContent = `页面剩余时间：${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+    }
+  }, 1000);
+}
+
+/* ================= 页面初始化 ================= */
+
+const adToken = getAdToken();
+const btn = document.getElementById("genBtn");
+const codeEl = document.getElementById("codeDisplay");
+const errEl = document.getElementById("error");
+
+// 没有 adToken 直接禁止
+if (!adToken || adToken.length < 8) {
+  btn.disabled = true;
+  errEl.textContent = "广告验证失败，请重新观看广告进入";
+} else {
+  startCountdown(Date.now() + PAGE_TTL);
+}
+
+/* ================= 生成卡密 ================= */
+
+btn.onclick = async () => {
+  btn.disabled = true;
+  errEl.textContent = "";
+  codeEl.style.display = "none";
+
+  try {
+    const res = await fetch(WORKER_API + "/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ adToken })
+    });
+
+    const data = await res.json();
+
+    if (!data.ok) {
+      throw new Error(data.msg || "生成失败");
     }
 
-    document.getElementById("main").style.display = "block";
-    startCountdown(Date.now() + VALID_DURATION);
-  };
+    codeEl.style.display = "block";
+    codeEl.textContent = "你的卡密：\n" + data.code;
 
-  // 点击生成卡密，请求Workers接口
-  document.getElementById("genBtn").onclick = async () => {
-    const btn = document.getElementById("genBtn");
-    const codeEl = document.getElementById("codeDisplay");
-    const errEl = document.getElementById("error");
-
-    btn.disabled = true;
-    errEl.innerText = "";
-
-    try {
-      const res = await fetch(`${WORKER_API}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "omit"
-      });
-
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.msg || "生成失败");
-
-      codeEl.style.display = "block";
-      codeEl.innerText = `你的卡密：${data.code}`;
-
-    } catch (e) {
-      errEl.innerText = e.message || "生成失败，请刷新页面重试";
-      btn.disabled = false;
-    }
-  };
-
-  // 页面有效期倒计时
-  function startCountdown(end) {
-    const el = document.getElementById("countdown");
-    const timer = setInterval(() => {
-      const t = Math.max(0, Math.floor((end - Date.now()) / 1000));
-      el.innerText = t <= 0
-        ? "页面已失效，请刷新重新验证广告"
-        : `页面剩余时间：${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
-      if (t <= 0) {
-        clearInterval(timer);
-        document.getElementById("genBtn").disabled = true;
-      }
-    }, 1000);
+  } catch (e) {
+    errEl.textContent = e.message || "请求失败，请稍后再试";
+    btn.disabled = false;
   }
+};
 </script>
 </body>
 </html>
