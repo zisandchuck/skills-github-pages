@@ -1,116 +1,41 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Roblox 工具卡密领取</title>
-
-  <style>
-    body {
-      background:#1a1a1a;
-      color:#fff;
-      font-family:Arial, sans-serif;
-      max-width:600px;
-      margin:60px auto;
-      padding:20px;
-      text-align:center;
-    }
-    .box {
-      background:#2d2d2d;
-      padding:30px;
-      border-radius:10px;
-    }
-    button {
-      padding:12px 28px;
-      background:#7289da;
-      color:#fff;
-      border:none;
-      border-radius:6px;
-      font-size:16px;
-      cursor:pointer;
-    }
-    button:disabled {
-      background:#555;
-    }
-    #code {
-      margin-top:20px;
-      font-size:18px;
-      letter-spacing:2px;
-      background:#3a3a3a;
-      padding:12px;
-      border-radius:6px;
-      display:none;
-    }
-    #msg {
-      margin-top:12px;
-      color:#ff6b6b;
-    }
-    #time {
-      margin-top:10px;
-      color:#aaa;
-      font-size:14px;
-    }
-  </style>
-</head>
-
-<body>
-<div class="box">
-  <h2>Roblox 工具卡密领取</h2>
-  <p>每次观看广告可获取 1 个卡密<br>（24 小时内账号仅能使用一次）</p>
-
-  <button id="btn">生成卡密</button>
-  <div id="code"></div>
-  <div id="msg"></div>
-  <div id="time"></div>
-</div>
-
 <script>
 const API = "https://roblox-auth.check868.workers.dev";
-const PAGE_LIFE = 10 * 60 * 1000; // 10 分钟
 
-const btn = document.getElementById("btn");
-const codeEl = document.getElementById("code");
-const msgEl = document.getElementById("msg");
-const timeEl = document.getElementById("time");
+let pageToken = null;
 
-// 页面时间窗（不依赖广告参数）
-const start = Date.now();
-const timer = setInterval(() => {
-  const left = PAGE_LIFE - (Date.now() - start);
-  if (left <= 0) {
-    btn.disabled = true;
-    timeEl.innerText = "页面已失效，请重新观看广告进入";
-    clearInterval(timer);
-  } else {
-    const m = Math.floor(left / 60000);
-    const s = Math.floor(left / 1000) % 60;
-    timeEl.innerText = `页面剩余时间：${m}:${String(s).padStart(2,"0")}`;
-  }
-}, 1000);
-
-btn.onclick = async () => {
-  btn.disabled = true;
-  msgEl.innerText = "";
-  codeEl.style.display = "none";
-
+// 页面加载：先换 pageToken
+(async () => {
   try {
-    const r = await fetch(API + "/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" }
-    });
-
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.msg || "生成失败");
-
-    codeEl.style.display = "block";
-    codeEl.innerText = d.code;
-
-  } catch (e) {
-    msgEl.innerText = e.message;
-    btn.disabled = false;
+    const res = await fetch(API + "/page");
+    const data = await res.json();
+    if (!data.ok) throw "fail";
+    pageToken = data.pageToken;
+  } catch {
+    alert("页面初始化失败，请重新从广告进入");
   }
+})();
+
+document.getElementById("genBtn").onclick = async () => {
+  if (!pageToken) {
+    alert("页面已过期，请重新从广告进入");
+    return;
+  }
+
+  const res = await fetch(API + "/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pageToken })
+  });
+
+  const data = await res.json();
+  if (!data.ok) {
+    alert(data.msg);
+    return;
+  }
+
+  document.getElementById("codeDisplay").style.display = "block";
+  document.getElementById("codeDisplay").innerText =
+    "你的卡密：" + data.code;
 };
 </script>
-</body>
-</html>
 
