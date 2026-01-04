@@ -155,7 +155,7 @@
 
         <div class="input-group">
             <label for="hwid">设备ID (HWID)</label>
-            <input type="text" id="hwid" placeholder="输入设备唯一标识" value="test_${Math.random().toString(36).substr(2, 9)}">
+            <input type="text" id="hwid" placeholder="输入设备唯一标识" value="">
         </div>
 
         <div class="step-buttons">
@@ -181,7 +181,7 @@
         const WORKER_URL = "https://r.check868.workers.dev";
         // 广告域名配置
         const AD_DOMAINS = {
-            lootlabs: "https://lootdest.org",
+            lootlabs: "https://lootdest.org/s?Li5EAgHB", // 补全的Lootlabs广告链接
             linkvertise: "https://linkvertise.com"
         };
 
@@ -250,8 +250,9 @@
                 return;
             }
 
-            // 打开广告页面
-            window.open(`${AD_DOMAINS.lootlabs}?step=1&hwid=${hwid}&robloxId=${robloxId}`, "_blank");
+            // 打开补全后的Lootlabs广告页面并拼接参数
+            const adUrl = `${AD_DOMAINS.lootlabs}&step=1&hwid=${hwid}&robloxId=${robloxId}`;
+            window.open(adUrl, "_blank");
             showStatus("已打开Step1广告页面，完成后自动验证...", "info");
 
             // 轮询验证广告状态
@@ -271,7 +272,14 @@
             const robloxId = robloxIdInput.value.trim();
             const hwid = hwidInput.value.trim();
 
-            window.open(`${AD_DOMAINS.linkvertise}?step=2&hwid=${hwid}&robloxId=${robloxId}`, "_blank");
+            if (!robloxId || !hwid) {
+                showStatus("请填写Roblox ID和设备ID", "error");
+                return;
+            }
+
+            // 替换为你的Linkvertise Step2链接
+            const adUrl = `${AD_DOMAINS.linkvertise}/your-step2-link-id?step=2&hwid=${hwid}&robloxId=${robloxId}`;
+            window.open(adUrl, "_blank");
             showStatus("已打开Step2广告页面，完成后自动验证...", "info");
 
             const interval = setInterval(async () => {
@@ -290,7 +298,14 @@
             const robloxId = robloxIdInput.value.trim();
             const hwid = hwidInput.value.trim();
 
-            window.open(`${AD_DOMAINS.linkvertise}?step=3&hwid=${hwid}&robloxId=${robloxId}`, "_blank");
+            if (!robloxId || !hwid) {
+                showStatus("请填写Roblox ID和设备ID", "error");
+                return;
+            }
+
+            // 替换为你的Linkvertise Step3链接
+            const adUrl = `${AD_DOMAINS.linkvertise}/your-step3-link-id?step=3&hwid=${hwid}&robloxId=${robloxId}`;
+            window.open(adUrl, "_blank");
             showStatus("已打开Step3广告页面，完成后自动验证...", "info");
 
             const interval = setInterval(async () => {
@@ -308,6 +323,11 @@
         generateBtn.addEventListener("click", async () => {
             const robloxId = robloxIdInput.value.trim();
             const hwid = hwidInput.value.trim();
+
+            if (!robloxId || !hwid) {
+                showStatus("请填写Roblox ID和设备ID", "error");
+                return;
+            }
 
             try {
                 const response = await fetch(`${WORKER_URL}/generate-key`, {
