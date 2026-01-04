@@ -128,9 +128,9 @@
     <div id="key-display"></div>
 
     <script>
-        // 配置项 - 替换为你的实际地址
+        // 配置项 - 已更新新的Lootslab广告链接
         const WORKERS_URL = "https://r.check868.workers.dev"; // 你的Workers域名
-        const LOOTSLAB_AD_URL = "https://loot-link.com/s?l9gbzDi2"; // Step1的Lootslab广告链接
+        const LOOTSLAB_AD_URL = "https://loot-link.com/s?G02Nvp4U"; // 新的Step1 Lootslab广告链接
         const LINKVERTISE_AD2_URL = "你的Linkvertise Step2广告链接"; // Step2的Linkvertise广告链接
         const LINKVERTISE_AD3_URL = "你的Linkvertise Step3广告链接"; // Step3的Linkvertise广告链接
         const PAGES_URL = "https://zisandchuck.github.io"; // 你的GitHub Pages域名
@@ -156,7 +156,7 @@
         window.onload = function() {
             const hwid = getHWID();
             
-            // Step1广告链接（带自动校验参数）
+            // Step1广告链接（带自动校验参数，适配新Lootslab链接）
             const ad1FinalUrl = `${LOOTSLAB_AD_URL}&hwid=${hwid}&robloxId=${ROBLOX_ID}&callback=${PAGES_URL}?step=1&source=step1&autoCheck=1`;
             document.getElementById("ad1-link").href = ad1FinalUrl;
 
