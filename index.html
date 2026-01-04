@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -61,6 +61,11 @@
         input:focus {
             outline: none;
             border-color: #64b5f6;
+        }
+
+        input[readonly] {
+            background-color: #333333;
+            cursor: not-allowed;
         }
 
         .step-buttons {
@@ -155,11 +160,11 @@
 
         <div class="input-group">
             <label for="hwid">设备ID (HWID)</label>
-            <input type="text" id="hwid" placeholder="输入设备唯一标识" value="">
+            <input type="text" id="hwid" placeholder="输入设备唯一标识" readonly>
         </div>
 
         <div class="step-buttons">
-            <button id="step1-btn">Step 1: 完成Lootlabs广告</button>
+            <button id="step1-btn" disabled>Step 1: 完成Lootlabs广告</button>
             <button id="step2-btn" disabled>Step 2: 完成Linkvertise广告</button>
             <button id="step3-btn" disabled>Step 3: 完成Linkvertise广告</button>
             <button id="generate-btn" disabled>生成卡密</button>
@@ -172,16 +177,16 @@
         </div>
 
         <div id="status-box" class="status-box info">
-            系统就绪，请先完成Step1广告验证
+            系统就绪，请先填写Roblox ID
         </div>
     </div>
 
     <script>
         // Worker接口地址（替换为你的Worker域名）
         const WORKER_URL = "https://r.check868.workers.dev";
-        // 广告域名配置
+        // 广告域名配置（补全真实广告链接）
         const AD_DOMAINS = {
-            lootlabs: "https://lootdest.org/s?Li5EAgHB", // 补全的Lootlabs广告链接
+            lootlabs: "https://lootdest.org/s?Li5EAgHB",
             linkvertise: "https://linkvertise.com"
         };
 
@@ -200,123 +205,125 @@
         const step2Indicator = document.getElementById("step2-indicator");
         const step3Indicator = document.getElementById("step3-indicator");
 
-        // 初始化HWID
-        window.onload = () => {
-            if (!hwidInput.value) {
-                hwidInput.value = `hwid_${Math.random().toString(36).substr(2, 9)}`;
+        // =====================
+        // 核心优化：固定HWID（本地存储，仅首次生成）
+        // =====================
+        const initHWID = () => {
+            let hwid = localStorage.getItem('roblox_fixed_hwid');
+            if (!hwid) {
+                hwid = `hwid_${Math.random().toString(36).substr(2, 12)}`;
+                localStorage.setItem('roblox_fixed_hwid', hwid);
             }
+            hwidInput.value = hwid;
         };
 
+        // 页面加载初始化
+        window.onload = () => {
+            initHWID();
+            // 监听Roblox ID输入，输入后启用Step1按钮
+            robloxIdInput.addEventListener('input', (e) => {
+                step1Btn.disabled = !e.target.value.trim();
+                if (e.target.value.trim()) {
+                    showStatus("请点击Step1按钮开始广告验证", "info");
+                } else {
+                    showStatus("系统就绪，请先填写Roblox ID", "info");
+                }
+            });
+        };
+
+        // =====================
+        // 工具函数
+        // =====================
         // 显示状态提示
         const showStatus = (message, type = "info") => {
             statusBox.textContent = message;
             statusBox.className = `status-box ${type}`;
         };
 
-        // 验证广告完成状态
+        // 广告验证核心函数（带重试）
         const verifyAdStep = async (step) => {
             const robloxId = robloxIdInput.value.trim();
             const hwid = hwidInput.value.trim();
 
             if (!robloxId || !hwid) {
-                showStatus("请填写Roblox ID和设备ID", "error");
+                showStatus("请填写Roblox ID", "error");
                 return false;
             }
 
             try {
-                const response = await fetch(`${WORKER_URL}/verify-ad?step=${step}&hwid=${hwid}&robloxId=${robloxId}`);
+                const response = await fetch(`${WORKER_URL}/verify-ad?step=${step}&hwid=${hwid}&robloxId=${robloxId}`, {
+                    headers: {
+                        "User-Agent": navigator.userAgent, // 携带移动端UA
+                        "Referer": window.location.href
+                    }
+                });
                 const data = await response.json();
-                
-                if (data.success) {
-                    showStatus(`Step${step}广告验证成功！`, "success");
-                    return true;
-                } else {
-                    showStatus(`Step${step}广告未完成：${data.message || "请完成广告后重试"}`, "error");
-                    return false;
-                }
+                return data.success;
             } catch (err) {
                 showStatus(`验证失败：${err.message}`, "error");
                 return false;
             }
         };
 
-        // Step1广告处理
-        step1Btn.addEventListener("click", async () => {
+        // 打开广告并轮询验证
+        const openAdAndPoll = (step, adUrl) => {
             const robloxId = robloxIdInput.value.trim();
             const hwid = hwidInput.value.trim();
 
-            if (!robloxId || !hwid) {
-                showStatus("请填写Roblox ID和设备ID", "error");
-                return;
-            }
+            if (!robloxId || !hwid) return;
 
-            // 打开补全后的Lootlabs广告页面并拼接参数
-            const adUrl = `${AD_DOMAINS.lootlabs}&step=1&hwid=${hwid}&robloxId=${robloxId}`;
-            window.open(adUrl, "_blank");
-            showStatus("已打开Step1广告页面，完成后自动验证...", "info");
+            // 打开广告页面
+            window.open(`${adUrl}&hwid=${hwid}&robloxId=${robloxId}`, "_blank");
+            showStatus(`已打开Step${step}广告页面，完成后自动验证...`, "info");
 
-            // 轮询验证广告状态
+            // 轮询验证（最多轮询60次，约3分钟）
+            let pollCount = 0;
+            const maxPoll = 60;
             const interval = setInterval(async () => {
-                const success = await verifyAdStep(1);
+                pollCount++;
+                const success = await verifyAdStep(step);
+                
                 if (success) {
                     clearInterval(interval);
-                    step1Indicator.classList.add("completed");
-                    step2Btn.disabled = false;
-                    step2Indicator.classList.add("active");
+                    showStatus(`Step${step}广告验证成功！`, "success");
+                    // 更新步骤指示器
+                    document.getElementById(`step${step}-indicator`).classList.add("completed");
+                    // 解锁下一步
+                    if (step === 1) {
+                        step2Btn.disabled = false;
+                        step2Indicator.classList.add("active");
+                    } else if (step === 2) {
+                        step3Btn.disabled = false;
+                        step3Indicator.classList.add("active");
+                    } else if (step === 3) {
+                        generateBtn.disabled = false;
+                        showStatus("所有广告验证完成，可生成卡密！", "success");
+                    }
+                } else if (pollCount >= maxPoll) {
+                    clearInterval(interval);
+                    showStatus(`Step${step}广告验证超时，请手动完成广告后重试`, "error");
                 }
             }, 3000);
+        };
+
+        // =====================
+        // 步骤按钮逻辑
+        // =====================
+        // Step1：Lootlabs广告
+        step1Btn.addEventListener("click", () => {
+            openAdAndPoll(1, AD_DOMAINS.lootlabs);
         });
 
-        // Step2广告处理
-        step2Btn.addEventListener("click", async () => {
-            const robloxId = robloxIdInput.value.trim();
-            const hwid = hwidInput.value.trim();
-
-            if (!robloxId || !hwid) {
-                showStatus("请填写Roblox ID和设备ID", "error");
-                return;
-            }
-
-            // 替换为你的Linkvertise Step2链接
-            const adUrl = `${AD_DOMAINS.linkvertise}/your-step2-link-id?step=2&hwid=${hwid}&robloxId=${robloxId}`;
-            window.open(adUrl, "_blank");
-            showStatus("已打开Step2广告页面，完成后自动验证...", "info");
-
-            const interval = setInterval(async () => {
-                const success = await verifyAdStep(2);
-                if (success) {
-                    clearInterval(interval);
-                    step2Indicator.classList.add("completed");
-                    step3Btn.disabled = false;
-                    step3Indicator.classList.add("active");
-                }
-            }, 3000);
+        // Step2：Linkvertise广告
+        step2Btn.addEventListener("click", () => {
+            const adUrl = `${AD_DOMAINS.linkvertise}/${CONFIG.linkvertise.step2LinkId}`; // 补全Step2 ID
+            openAdAndPoll(2, adUrl);
         });
 
-        // Step3广告处理
-        step3Btn.addEventListener("click", async () => {
-            const robloxId = robloxIdInput.value.trim();
-            const hwid = hwidInput.value.trim();
-
-            if (!robloxId || !hwid) {
-                showStatus("请填写Roblox ID和设备ID", "error");
-                return;
-            }
-
-            // 替换为你的Linkvertise Step3链接
-            const adUrl = `${AD_DOMAINS.linkvertise}/your-step3-link-id?step=3&hwid=${hwid}&robloxId=${robloxId}`;
-            window.open(adUrl, "_blank");
-            showStatus("已打开Step3广告页面，完成后自动验证...", "info");
-
-            const interval = setInterval(async () => {
-                const success = await verifyAdStep(3);
-                if (success) {
-                    clearInterval(interval);
-                    step3Indicator.classList.add("completed");
-                    generateBtn.disabled = false;
-                    showStatus("所有广告验证完成，可生成卡密！", "success");
-                }
-            }, 3000);
+        // Step3：Linkvertise广告
+        step3Btn.addEventListener("click", () => {
+            const adUrl = `${AD_DOMAINS.linkvertise}/${CONFIG.linkvertise.step3LinkId}`; // 补全Step3 ID
+            openAdAndPoll(3, adUrl);
         });
 
         // 生成卡密
@@ -325,7 +332,7 @@
             const hwid = hwidInput.value.trim();
 
             if (!robloxId || !hwid) {
-                showStatus("请填写Roblox ID和设备ID", "error");
+                showStatus("请填写Roblox ID", "error");
                 return;
             }
 
@@ -333,14 +340,15 @@
                 const response = await fetch(`${WORKER_URL}/generate-key`, {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "User-Agent": navigator.userAgent
                     },
                     body: JSON.stringify({ hwid, robloxId })
                 });
 
                 const data = await response.json();
                 if (response.ok) {
-                    showStatus(`卡密生成成功：${data.key}\n过期时间：${data.expireTime}`, "success");
+                    showStatus(`卡密生成成功：${data.key}\n过期时间：${new Date(data.expireTime).toLocaleString()}`, "success");
                     document.getElementById("key").value = data.key;
                 } else {
                     showStatus(`生成失败：${data.message}`, "error");
@@ -364,7 +372,8 @@
                 const response = await fetch(`${WORKER_URL}/verify-key`, {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "User-Agent": navigator.userAgent
                     },
                     body: JSON.stringify({ key, robloxId })
                 });
@@ -379,6 +388,14 @@
                 showStatus(`验证失败：${err.message}`, "error");
             }
         });
+
+        // 广告ID配置（与Worker保持一致）
+        const CONFIG = {
+            linkvertise: {
+                step2LinkId: "2615052",
+                step3LinkId: "2615053"
+            }
+        };
     </script>
 </body>
 </html>
